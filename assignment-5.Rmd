@@ -1,0 +1,89 @@
+---
+title: "Assignment 5 - Reporting and communication"
+author: "Aditya Naryan Rai"
+date: "`r format(Sys.time(), '%B %d, %Y | %H:%M:%S | %Z')`"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: tango
+    number_sections: no
+    theme: cosmo
+    toc: no
+---
+
+<style>
+div.answer {background-color:#f3f0ff; border-radius: 5px; padding: 20px;}
+</style>
+
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      error = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      comment = NA)
+```
+
+<!-- Do not forget to input your Github username in the YAML configuration up there --> 
+
+***
+
+```{r, include = F}
+# load packages here if necessary
+library(tidyverse)
+library(ggplot2)
+```
+
+<br>
+
+***
+
+### Task 1 - Data communication with flexdashboard
+
+The file `airbnb.csv` contains data of [Airbnb listings in New York City for 2019](http://insideairbnb.com/). To work on the following tasks, please use `flexdashboard_template.Rmd`.
+
+a) Create an interactive table that reports the price of the 100 most and least expensive listings together with values on two other variables of interest from the dataset. Use the `DT` package to render an interactive table!
+
+b) Provide a chart that presents the univariate distribution of one of the variables in the dataset, adhering to good practice of plot design.
+
+c) Use the data to fit a linear model to predict the log transformation of the `price` variable. Your model should make use of at least three covariates, at least one of which should be a discrete (not continuous) variable. Then, create a plot that compares your model predictions versus the actual prices, and that adheres to the good practice of plot design. Use colors to highlight the belonging of the individual observations to one of the discrete predictors in your model.
+
+d) Create an interactive `leaflet` map, mapping a random subsample of 100 of the host locations.
+
+e) Compile your `flexdashboard` dashboard by populating it with the plots you created in task 2a-d, arranging the panels as follows: Plot a) in column 1, plots b) and c) in column 2, and plot d) in column 3. Your dashboard should adhere to principles of good dashboard design. Knit and save the result as `flexdashboard.html` in your assignment repository.
+
+<br>
+
+***
+
+### Task 2 - Evaluating a dashboard
+
+Look for a dashboard that is openly accessible online (but none of those we discussed in class). Provide a link together with a screenshot and a brief description of what the dashboard offers in terms information and what data it is built on. Then, provide three suggestions of how the dashboard could be improved from a design perspective.
+
+<div class = "answer"> 
+
+[CSR Expenditure in India: Summary](https://www.csr.gov.in/content/csr/global/master/home/home.html)
+
+<img src="C:/Users/adity/Desktop/R_Intro/assignment-5-adityanarayan-rai/dashboard_example.png" alt="Dashboard Example">
+
+The dashboard provide the summary of CSR (Corporate Social Responsibility) Expenditure in India. As per the Companies Act, 2013, CSR is a mandatory provision on companies to take up CSR projects towards social welfare activities. 
+
+The dashboard starts with first providing information on the total number of companies, total amount spent on CSR, total States and Union Territories covered, total number of CSR projects undertaken and total number of development sectors and then it provides graphical information by breaking up the above components.
+
+</div>
+
+<br>
+
+<div class = "answer"> 
+
+The three suggestions from the design perspective on the dashboard are as follows:
+
+1. In the first graph which provides the Geographical Distribution of CSR Money spent in the map, there is no labeling for what does the color pattern stands for. The clarity can be enhanced by incorporating a legend or color scale that clearly explains the representation of each color on the map.
+
+2. In the second last graph where "CSR Spent across PSU (Public Sector Units) and Non-PSU companies" is being displayed, it would have been nice to present that information in a bar graph and also include percentage of total for both type of companies. I think doing this will provide a more detailed and insightful view of the distribution of CSR spending across different company types.
+
+3. In the last visual, which is a pie graph on CSR Compliance company-wise, I would advise against using the donut-graph because it's not clear what is the total here. A simple bar chart would have been nice here. The same goes for the second graph. I think a bar chart will offer a clearer representation of individual contributions, making it easier for users to compare CSR compliance across different companies.
+
+</div>
