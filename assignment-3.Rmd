@@ -1,0 +1,310 @@
+---
+title: "Assignment 3 - Web data"
+author: "Aditya Narayan Rai - adityanarayan-rai"
+date: "`r format(Sys.time(), '%B %d, %Y | %H:%M:%S | %Z')`"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: tango
+    number_sections: no
+    theme: cosmo
+    toc: no
+---
+  
+<style>
+div.answer {background-color:#f3f0ff; border-radius: 5px; padding: 20px;}
+</style>
+
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      error = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      comment = NA)
+```
+
+<!-- Do not forget to input your Github username in the YAML configuration up there --> 
+
+***
+
+```{r, include = T}
+library(dplyr)
+library(stringr)
+library(rvest)
+library(httr)
+library(purrr)
+library(xml2)
+library(urltools)
+library(httr)
+library(jsonlite)
+```
+
+<br>
+
+***
+
+### Task 1 - Speaking regex and XPath
+
+a) Below is a messy string that contains data on IP addresses and associated cities and their countries as well as latitudes and longitudes. Use regular expressions to parse information from the string and store all variables in a data frame. Return the data frame.
+
+```{r}
+ip_geolocated <- "24.33.233.189 Ohio, USA 39.6062 -84.1695 199.53.213.86 Zurich (Switzerland) 47.3686 8.5391 85.114.48.220 Split-Dalmatia - Croatia 43.0432 16.0875 182.79.240.83 Telangana/India 17.411 78.4487"
+```
+
+```{r}
+#First, let's define Regular Expression for Pattern Matching using str_match_all
+str_matches <- str_match_all(ip_geolocated, "\\d+\\.\\d+\\.\\d+\\.\\d+\\s+([^0-9]+)\\s+([-0-9.]+)\\s+([-0-9.]+)")
+
+#Note 1: \\d+\\.\\d+\\.\\d+\\.\\d+ is a regular expression that matches an IP address in the format of four sets of digits separated by periods.
+
+#Note 2: \\s+([^0-9]+) matches one or more whitespace characters followed by a group of characters that are not digits. This is for location information.
+
+#Note 3: \\s+([-0-9.]+) matches one or more whitespace characters followed by a group of characters that can be digits, hyphens (for negative values), and periods (for decimal values). This is for latitude and longitude information.
+
+#Now, let's extract the data from the messy string using the matches and other functions
+ip <- unlist(regmatches(ip_geolocated, gregexpr("\\d+\\.\\d+\\.\\d+\\.\\d+", ip_geolocated)))
+location <- str_matches[[1]][, 2]
+latitude <- str_matches[[1]][, 3]
+longitude <- str_matches[[1]][, 4]
+                       
+#Finally, let's store the variables into a dataframe and take a look at our dataframe
+ip_geolocated_new <- data.frame(IP_Address = ip, Location = location, Latitude = latitude, Longitude = longitude)
+ip_geolocated_new
+                       
+```
+
+<br>
+
+b) The file `potus.xml`, available at http://www.r-datacollection.com/materials/ch-4-xpath/potus/potus.xml, provides information on past presidents of the United States. Import the file into R using `read_xml()`, which works like `read_html()`---just for XML files. Applying XPath expressions, extract the names and nicknames of all presidents, store them in a data frame, and present the first 5 rows. <i>(Hint: this is an XML document, so `html_nodes()` will not work.)</i> Finally, extract and provide the occupations of all presidents who happened to be Baptists.
+
+```{r}
+#Answer to the Part 1
+#Let's set-up the URL and save it
+url <- "http://www.r-datacollection.com/materials/ch-4-xpath/potus/potus.xml"
+doc <- read_xml(url)
+
+#Now, let's extract the name of the Presidents from the URL and save it
+names <- xml_text(xml_find_all(doc, "//name"))
+
+#Now, let's extract the nicknames of the Presidents and save it
+nicknames <- xml_text(xml_find_all(doc, "//nickname"))
+
+#Merge the two dataframes created above and save them to a new dataframe
+presidents_df <- data.frame(Name = names, Nickname = nicknames)
+
+#Let's see the first five presidents from the dataframe
+head(presidents_df, 5)
+```
+
+```{r}
+#Answer to Part 2
+#Now, let's extract the occupations of Baptist presidents and save it
+baptist_occupations <- doc %>%
+  xml_find_all("//president[religion='Baptist']/occupation") %>%
+  xml_text() %>%
+  trimws()
+
+#Again, let's extract the names of Baptist presidents and save it
+baptist_names <- doc %>%
+  xml_find_all("//president[religion='Baptist']/name") %>%
+  xml_text() %>%
+  trimws()
+
+#Note: I used stackoverflow to learn about the use of trimws() function
+
+#Merge the two dataframes created above and save them to a new dataframe
+baptist_presidents_df <- data.frame(Name = baptist_names, Occupation = baptist_occupations)
+
+#Let's take a peek at the dataframe
+baptist_presidents_df
+```
+
+
+<br>
+
+***
+
+### Task 2 - Towers of the world
+
+The article [List of tallest towers](https://en.wikipedia.org/wiki/List_of_tallest_towers) on the English Wikipedia provides various lists and tables of tall towers. Using the article version as it was published at 15:31, 18 September 2021 (accessible under the following permanent link: https://en.wikipedia.org/w/index.php?title=List_of_tallest_towers&oldid=1175962653), work on the following tasks.
+
+a) Scrape the table "Towers proposed or under construction" and parse the data into a data frame. Clean the variables for further analysis. Then, print the dataset.
+
+```{r}
+#Let's set-up the URL and save it
+url <- "https://en.wikipedia.org/w/index.php?title=List_of_tallest_towers&oldid=1175962653"
+webpage <- read_html(url)
+
+#Now for the table - "Towers proposed or under construction", let's specify the CSS selector. I counted the number of tables on the webpage
+towers_table <- html_nodes(webpage, "table.wikitable")[6]
+
+#Let's extract the table as a data frame
+towers_data <- html_table(towers_table, fill = TRUE)
+
+#Covert the d]list to the dataframe and name it towers
+towers <- towers_data[[1]]
+
+#Let's see how the dataframe looks like
+towers
+
+#Let's do some basic cleaning to make it more presentable - rename, remove, character to numeric
+#Remove the "Reference" column becuase we don't need it here
+towers <- towers %>% select(-Ref)
+
+towers <- towers %>%
+  rename(
+    Tower_Name = Tower,
+    Year = Year,
+    Country = Country,
+    City = City,
+    Pinnacle_Height = `Pinnacle height`,
+    Status = Status,
+    Function = Function,
+  )
+
+towers$Year[towers$Year == "?"] <- NA
+towers$Year <- as.numeric(towers$Year)
+
+towers$Pinnacle_Height <- as.numeric(gsub("[^0-9.]", "", towers$Pinnacle_Height))
+
+print(towers)
+```
+
+<br>
+
+b) What is the sum of the planned pinnacle height of all observation towers? Use R to compute the answer.
+
+```{r}
+#First, let's filter the data frame for observation towers and save it
+observation_towers <- towers %>%
+  filter(grepl("observation", tolower(Function)))
+
+#Note: I was having some problems in filtering the dataframe so I got this code from Stackoverflow
+
+#Now, let's calculate the sum of the planned pinnacle heights
+total_pinnacle_height <- sum(observation_towers$Pinnacle_Height, na.rm = TRUE)
+
+#Let's check the answer
+print(total_pinnacle_height)
+```
+
+<br>
+
+c) Now, consider the Wikipedia articles on all countries in the original table. Provide polite code that downloads the linked article HTMLs to a local folder retaining the article names as file file names. Explain why your code follows best practice of polite scraping by implementing at least three practices (bullet points are sufficient). Provide proof that the download was performed successfully by listing the file names and reporting the total number of files contained by the folder. Make sure that the folder itself is not synced to GitHub using `.gitignore`.
+
+```{r}
+#First, let's create a folder for saving the HTML files
+dir.create("wikipedia_articles", showWarnings = FALSE)
+
+#Now, let's be a responsive user and define the user agent, i.e. yourself
+user_agent <- "Aditya/235843@students.hertie-school.org"
+
+#Again, carrying the baton of being a responsive user, let's define a delay between requests (in seconds) when extracting the data. I am going for 5 seconds
+delay_between_requests <- 5
+
+#Now, let's extract unique country names from the 'Country' column of our dataframe
+country_names <- unique(towers$Country)
+
+#Finally, let's download Wikipedia articles for each country one by one using the 'for' loop (Note: I looked for this code chunk on the internet)
+for (country in country_names) {
+  
+  #First, encode the country name for use in the URL
+  encoded_country <- url_encode(country)
+  
+  #Then, construct the Wikipedia URL for the country
+  country_url <- paste0("https://en.wikipedia.org/wiki/", encoded_country)
+  
+  #Now, set the user-agent in headers
+  headers <- add_headers("Aditya/235843@students.hertie-school.org" = user_agent)
+  
+  #Now, make a GET request with a delay
+  GET(country_url, headers = headers, delay = delay_between_requests)
+  
+  #Finally, read and save the HTML page to a file
+  country_html <- read_html(country_url)
+  write_html(country_html, file.path("wikipedia_articles", paste0(encoded_country, ".html")))
+}
+
+#Now, let's list the downloaded files
+downloaded_files <- list.files("wikipedia_articles")
+cat("Downloaded files:\n")
+cat(downloaded_files, sep = "\n")
+
+#And finally, let's report the total number of downloaded files
+cat("\nTotal number of files: ", length(downloaded_files), "\n")
+
+#Note to the Prof for reference: I was stuck in many places while extracting the data so I used a bit of Chatgpt and stackoverlflow to understand the codes and the tools. It would be nice if you can share a detailed snippet of how would you do this. Thanks!
+```
+
+<br>
+
+***
+
+### Task 3 - Eat my shorts
+
+Write a R wrapper for the Simpons Quote API (https://thesimpsonsquoteapi.glitch.me/) that accepts input for `character` and `count` parameters and that returns data in `data.frame` format. The function should also return a meaningful message that, e.g., reports the number of quotes fetched as well as the first fetched quote and its author if possible. Show that it works with an example prompt.
+
+```{r}
+#First, let's write the function to fetch Simpsons quotes
+simpsons_quotes <- function(character = NULL, count = 1) {
+  #Define the API
+  simpsons_url <- "https://thesimpsonsquoteapi.glitch.me/quotes"
+  
+  #Now, let's create the query parameters - character and count
+  query_parameters <- list()
+  if (!is.null(character)) {
+    query_parameters[["character"]] <- character
+  }
+  if (count > 0) {
+    query_parameters[["count"]] <- count
+  }
+  
+  #And now, let's send the GET request to the API
+  response <- GET(url = simpsons_url, query = query_parameters)
+  
+  #Note to the Prof: I was able to do code till here. From here onwards, I took help from the stackoverflow and the ChatGPT. It would be nice if you can share a detailed snippet of how would you do this. Thanks!
+  
+  #Let's check if the request was successful
+  if (http_type(response) == "application/json") {
+    #Parse the JSON response
+    quotes <- fromJSON(content(response, "text"))
+    
+    if (length(quotes) > 0) {
+      #Now, create a data frame from the quotes
+      quote_df <- as.data.frame(do.call(rbind, quotes))
+      
+      #And, get the number of quotes fetched
+      num_quotes_fetched <- nrow(quote_df)
+      
+      #Let's also add messages in case of extracting the quotes
+      message <- paste("Fetched", num_quotes_fetched, "Simpsons quote(s).")
+      
+      #If there are quotes, add the first one and its author to the message
+      if (num_quotes_fetched > 0) {
+        message <- paste(message, "\nFirst quote:", quote_df$quote[1])
+        if (!is.null(quote_df$character[1])) {
+          message <- paste(message, "Author:", quote_df$character[1])
+        }
+      }
+      
+      cat(message, "\n")
+      return(quote_df)
+    } else {
+      cat("No quotes found for the given parameters.\n")
+      return(NULL)
+    }
+  } else {
+    cat("Failed to retrieve Simpsons quotes. Please check your parameters and try again.\n")
+    return(NULL)
+  }
+}
+
+#Let's see how the function works: we will fetch 3 quotes for the character "Homer" and display the results
+quotes_homer <- simpsons_quotes(character = "Homer", count = 3)
+print(quotes_homer)
+```
+
+
