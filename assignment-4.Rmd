@@ -1,0 +1,253 @@
+---
+title: "Assignment 4 - Visualization"
+author: "Aditya Narayan Rai"
+date: "`r format(Sys.time(), '%B %d, %Y | %H:%M:%S | %Z')`"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: tango
+    number_sections: no
+    theme: cosmo
+    toc: no
+---
+  
+
+<style>
+div.answer {background-color:#f3f0ff; border-radius: 5px; padding: 20px;}
+</style>
+
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      error = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      comment = NA)
+```
+
+***
+
+```{r, include = T}
+# LOAD THE PACKAGES YOU ARE USING IN THIS CODE CHUNK
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(grid)
+library(gridExtra)
+```
+
+
+<br>
+
+***
+
+### Task 1 - Principles of good data visualization
+
+Over at [Our World in Data](https://ourworldindata.org/grapher/child-mortality-vs-health-expenditure) you will find a chart illustrating child mortality vs. health expenditure, 2000 to 2019, across countries.
+
+Download the data and reproduce the plot as closely as possible using only the 2019 data (i.e. the bubble scatter plot that you see when you move the slider to the right) and log scales. Your plot does not have to be interactive and the colors don't have to exactly match those from the original plot as long as your plot remains well readable.
+  
+```{r}
+# Let's load the data
+world_data <- read.csv("C:/Users/adity/Desktop/R_Intro/assignment-4-adityanarayan-rai/child-mortality-vs-health-expenditure.csv")
+# Note: Please change the file path if you are going replicate the code
+
+# Now, let's check the variable names of the dataset
+# colnames(world_data)
+
+# Let's do some data cleaning to make the dataset ready - change the column names
+colnames(world_data)[colnames(world_data) == "Observation.value...Unit_of_measure..Deaths.per.100.live.births...Indicator..Under.five.mortality.rate...Sex..Both.sexes...Wealth_quintile..All.wealth.quintiles"] <- "child_mortality"
+
+colnames(world_data)[colnames(world_data) == "Current.health.expenditure.per.capita..PPP..current.international..."] <- "health_exp"
+
+colnames(world_data)[colnames(world_data) == "Population..historical.estimates."] <- "population"
+
+colnames(world_data)[colnames(world_data) == "Entity"] <- "country"
+
+# Now, let's check the structure of our dataset to do other data cleaning 
+# str(world_data)
+
+# In our dataset, the value for the continent is only filled when the year is 2015. Let's take it out as a separate dataset
+continent_2015 <- world_data %>%
+  filter(Year == 2015) %>%
+  select(country, Continent)
+
+# Now, let's filter our data to include only observations for the year 2019
+world_data_2019 <- world_data %>% filter(Year == 2019)
+
+# Let's do a left join to get the observations for the continent column
+world_data_2019 <- world_data %>%
+  filter(Year == 2019) %>%
+  left_join(continent_2015, by = "country")
+
+# Create a logical vector indicating complete cases
+complete_cases <- complete.cases(world_data_2019[, c("child_mortality", "health_exp")])
+
+#Note: Before trying this, I was trying to drop the observations from the
+#country column manually. I did a google search and I got to know about complete
+#cases. It is used to identify and extract complete cases from a data frame or
+#matrix. A complete case is a row that contains no missing (NA) values across
+#all variables.
+
+# Filter the dataset to keep only complete cases
+world_data_2019 <- world_data_2019[complete_cases, ]
+
+# Still there are some observations which needs to be dropped
+countries_to_exclude <- c("High-income countries", "Low-income countries", "Lower-middle-income countries", "Upper-middle-income countries", "World")
+
+# Finally, let's get our dataset ready for the visualization
+world_data_2019 <- world_data_2019 %>%
+  filter(!country %in% countries_to_exclude)
+
+# Using ggplot we will try to create a similar visualization as on the webpage
+ggplot(world_data_2019, aes(x = health_exp, y = child_mortality, color = Continent.y, size = population)) +
+  geom_point(shape = 16, alpha = 0.7) +
+  geom_text(data = subset(world_data_2019, population > 1e8), 
+            aes(label = country), size = 3, hjust = 0.5, vjust = 0.5) + #to add country names in the graph
+  scale_size_continuous(labels = label_number_si(), range = c(2, 12), name = "Population") + #to depict the pop as on the webpage and not 1e+8
+  scale_color_brewer(palette = "Set1", name = "Continent") +
+  labs(title = "Child Mortality vs. Health Expenditure (2019)",
+       x = "Current health expenditure per capita, PPP($)",
+       y = "Child Mortality(%)",
+       caption = "Data source: Our World in Data") +
+  scale_x_log10(breaks = c(50, 100, 200, 500, 1000, 2000, 10000)) + #as on the webpage
+  scale_y_log10(breaks = c(0.2, 0.5, 1, 2, 5, 10)) + #as on the webpage
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 12),
+        axis.title = element_text(size = 10),
+        legend.position = "right",
+        panel.grid.major = element_line(color = "gray", linetype = "dashed"),
+        panel.grid.minor = element_blank(),
+        aspect.ratio = 1)
+```
+
+<br>
+
+***
+
+### Task 2 - IMDb small multiples
+
+The file [`imdb_series_df.csv`](https://github.com/intro-to-data-science-23/assignment-4-setup/blob/main/imdb_series_df.csv.zip) contains a data set on rating information on series and episodes from the InternetMovieDatabase. Use these data to create a small multiples plot that illustrates a relationship of your choice. You can work with the entire dataset or a subset. Your plot should adhere to the principles of good design. In addition to the visualization, provide a sound discussion (10 sentences or less) of what the plot might tell us.
+
+*Note:* The data binary is fairly large (~93MB). It makes sense to download it first to your local drive and then import it into R. However, make sure that the file is not synced to GitHub using `.gitignore`.
+
+```{r}
+# Let's load the data
+imdb_data <- read.csv("./imdb_series_df.csv")
+
+# Let's do some basic data cleaning
+imdb_data <- imdb_data %>%
+  na.omit()
+
+#summary(imdb_data)
+
+# We are going to create two separate multiple plots and check how the relationship between average ratings and number of votes changed between two different time zones: 1930&1980 and 1981&2020
+
+# Let's filter the data for the years 1930 to 1980 and save as a new df
+imdb_data_1 <- imdb_data %>%
+  filter(start_year >= 1930 & start_year <= 1980)
+
+#Let's filter the data for the years 1981 to 2020 and save as a new df
+imdb_data_2 <- imdb_data %>%
+  filter(start_year >= 1981 & start_year <= 2020)
+
+# Now, let's create a multiples plot for the first df
+plot_1 <- ggplot(imdb_data_1, aes(x = num_votes, y = avg_rating)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  scale_x_log10(breaks = c(1, 10, 100, 1000, 10000),
+    labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_continuous(breaks = c(0, 5, 10), limits = c(0, 10)) +
+  facet_wrap(~start_year, scales = "free") +
+  labs(title = "Average Rating vs. Number of Votes (1930-1980)",
+       x = "Number of Votes (log scale)",
+       y = "Average Rating") +
+  theme(strip.text = element_text(size = 8),
+        strip.background = element_blank())
+
+# Let's also check the correlation between the two variables for the time-period
+cor(imdb_data_1$num_votes, imdb_data_1$avg_rating)
+
+# Let's have a look at our plot
+print(plot_1)
+
+# Now, let's create another multiples plot for the second df
+plot_2 <- ggplot(imdb_data_2, aes(x = num_votes, y = avg_rating)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  scale_x_log10(breaks = c(1, 10, 100, 1000, 10000),
+    labels = trans_format("log10", math_format(10^.x))) +
+  scale_y_continuous(breaks = c(0, 5, 10), limits = c(0, 10)) +
+  facet_wrap(~start_year, scales = "free") +
+  labs(title = "Average Rating vs. Number of Votes (1981-2020)",
+       x = "Number of Votes (log scale)",
+       y = "Average Rating") +
+  theme(strip.text = element_text(size = 8),
+        strip.background = element_blank())
+
+# Let's also check the correlation between the two variables for the time-period
+cor(imdb_data_2$num_votes, imdb_data_2$avg_rating)
+
+# Let's have a look at our plot
+print(plot_2)
+```
+Interpretation: The two visualizations are created to investigate the relationship between the average rating and the number of votes for TV series episodes over two distinct periods. The first visualization spans from 1930 to 1980, revealing a weak positive correlation (correlation coefficient = 0.0614). The scatterplots, along with red linear regression lines, display the nuanced relationship, with facets representing each start year. We can see that the in the beginning year the relationship is almost null because of the limited options. 
+The second visualization covers the years 1981 to 2020, where a slightly stronger positive correlation can be observed (correlation coefficient = 0.1191). Blue regression lines illustrate the relationship's strength, with facets providing insights into each start year. 
+Both visualizations have log-scaled axes for enhanced visualization of a wide range of votes. The correlation coefficients suggests a subtle connection between the number of votes and average ratings in both periods. Comparisons between the two periods reveal a nuanced evolution in viewer engagement patterns.
+<br>
+
+
+***
+
+### Task 3 - Principles of good data visualization
+
+On [slide 75 of the lecture slides ("Dos and "Don'ts")](https://raw.githack.com/intro-to-data-science-22/lectures/main/09-visualization/09-visualization.html#85) you find a linked list of 20 statements expressing principles of good data visualization. Follow the links to learn more about them. Then, come up with another principle of good data visualization **that is not listed on the slide** and illustrate it following the instructions below: 
+
+  (i) Create a two-panel plot. The left panel shows a poorly designed plot (e.g., a 3D plot), the right panel shows a well-designed alternative using the same data. You are free to use whatever data you want to make your point.
+  (ii) The title of the plot should be the name of the principle, e.g. "**Don't go 3D.**"
+  (iii) The bottom of the plot should provide a note that explains, in a few sentences, the principle illustrated in the plot and how the right is an improved over the left version.
+  (iv) Embed the plot in your `.Rmd` but also provide it as a `.png` or `.pdf` in your submission repo.
+
+
+```{r}
+# Let's generate an example data
+set.seed(456)
+dates <- seq(as.Date("2023-01-01"), as.Date("2023-01-10"), by = "days")
+sales <- c(100, 120, 80, 150, 130, 90, 110, 95, 120, 140)
+
+# Convert data to a data frame
+df <- data.frame(Date = dates, Sales = sales)
+
+# Left panel: Poorly designed plot using base R plot
+poor_plot <- ggplot(df, aes(x = Date, y = Sales)) +
+  geom_line(color = "red", size = 1.5) +
+  labs(title = "Poorly Designed Plot", x = "Date", y = "Sales")
+
+# Well-designed plot (right panel) using ggplot2
+well_plot <- ggplot(df, aes(x = Date, y = Sales)) +
+  geom_point(color = "red", size = 2) +
+  geom_line(color = "blue", size = 1) +
+  labs(title = "Well-Designed Plot", x = "Date", y = "Sales")
+
+note <- "In this example, the left panel represents a poorly designed plot with a line connecting the sales data points, which may not capture the day-to-day variations well. The right panel shows a well-designed alternative using the same data, where points are added to represent each day, providing a clearer view of individual data points and trends."
+
+# Combine the plots using grid.arrange
+combined_plot <- grid.arrange(
+  poor_plot,
+  well_plot,
+  nrow = 1,
+  top = "The Principle of Temporal Granularity",
+  bottom = textGrob(str_wrap(note, 88),
+                    gp = gpar(fontface = 3, fontsize = 9),
+                    hjust = 0.5)
+)
+
+combined_plot
+
+# Save the combined plot as an image file (e.g., PNG)
+ggsave("combined_plot.png", plot = combined_plot, width = 10, height = 4, units = "in")
+```
+Note to the Prof: After going through the principles of good data visualization through the links in the slide, I started searching for the principles of good visualization for different kinds of data-types. That's when I came across this and decided to include it here. I know that this in a way is deriving many practices from the list provided in the slide but for a specific type of data (in this case - time-series data), I suppose can be used.
