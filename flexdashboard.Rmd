@@ -1,0 +1,132 @@
+---
+title: "Assignment 5 - Reporting and communication"
+author: "Aditya Narayan Rai"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: cosmo
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(leaflet)
+library(DT)
+library(ggplot2)
+library(scales)
+```
+
+Column 
+--------------------------------------------------------------------------------------------
+
+### Interactive Table
+
+```{r}
+#First let's load the dataset
+airbnb <- read.csv("airbnb_data.csv")
+
+#Let's check how the variables in the dataset look like
+#summary(airbnb)
+#colnames(airbnb)
+
+#Now, let's extract the 100 most expensive listings
+top_100_expensive <- head(airbnb[order(-airbnb$price), ], 100)
+
+#And, now let's extract the 100 least expensive listings
+bottom_100_expensive <- head(airbnb[order(airbnb$price), ], 100)
+
+#Let's combine the the most and least expensive together
+expensive <- rbind(top_100_expensive, bottom_100_expensive)
+
+#Now, let's pick two other variables of interest (in our case they are room type and the neighbourhood)
+selected_columns <- c("price", "room_type", "neighbourhood_group")
+
+
+#Finally let's create the interactive table using DT and save it
+plot_1 <- datatable(expensive[, selected_columns], 
+          options = list(pageLength = 10),  # Adjust the number of rows per page as needed
+          caption = "Top 100 Most and Least Expensive Airbnb Listings in NYC",
+          rownames = FALSE)
+
+#Let's check how the interactive table looks like
+plot_1
+```
+
+Column
+--------------------------------------------------------------------------------------------
+
+### The Distribution of a Variable (Number of Reviews)
+
+```{r}
+#Here, I am interested in the distribution of the number of reviews
+plot_2 <- ggplot(airbnb, aes(x = number_of_reviews)) +
+  geom_histogram(fill = "#69b3a2", color = "#404080", bins = 20) +
+  geom_vline(aes(xintercept = median(number_of_reviews)), 
+             color = "blue", linetype = "dashed", size = 1) +
+  ggtitle("Distribution of 'Number of Reviews' in Airbnb Listings (NYC)") +
+  xlab("Number of Reviews") +
+  ylab("Frequency") +
+  labs(caption = "Note: The blue line represents the median number of reviews") +
+  scale_x_continuous(labels = comma) +
+  theme_minimal()
+
+#Let's check how the interactive table looks like
+plot_2
+```
+
+### The Linear Model Predictions
+
+```{r}
+# Let's first check and remove the missing values
+airbnb1 <- na.omit(airbnb[c("price", "neighbourhood_group", "number_of_reviews", "reviews_per_month")])
+
+# Now, let's fit a linear model with one discrete and two continuous variables
+model <- lm(log(price + 1) ~ neighbourhood_group + number_of_reviews + reviews_per_month, data = airbnb1)
+
+# Now, let's make predictions using the model
+predictions <- exp(predict(model, newdata = airbnb1))
+
+# Now, let's create a data frame for plotting
+plot_data <- data.frame(Actual = airbnb1$price, Predicted = predictions, NeighbourhoodGroup = airbnb1$neighbourhood_group)
+
+# Let's create our plot using the plot_data
+plot_3 <- ggplot(plot_data, aes(x = Actual, y = Predicted, color = NeighbourhoodGroup)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black", size = 1) +
+  scale_color_discrete() +
+  labs(
+    title = "Model Predictions vs Actual Prices",
+    x = "Actual Price",
+    y = "Predicted Price",
+    caption = "Dashed line represents a perfect prediction"
+  ) +
+  theme_minimal()
+
+#Now let's check how our plot looks
+plot_3
+```
+
+Column 
+--------------------------------------------------------------------------------------------
+
+### Location of 100 Airbnb Host (Random Sample)
+
+```{r}
+# First let select the random subsample of 100 host locations
+set.seed(123)
+sample_indices <- sample(nrow(airbnb), 100)
+sample_data <- airbnb[sample_indices, ]
+
+# Now, let's create our leaflet map
+plot_4 <- leaflet(data = sample_data) %>%
+  addTiles() %>%
+  addMarkers(
+    lng = ~longitude,
+    lat = ~latitude,
+    popup = ~paste("Host ID: ", host_id, "<br>Price: $", price)
+  )
+
+#Now let's check how our plot looks
+plot_4
+```
