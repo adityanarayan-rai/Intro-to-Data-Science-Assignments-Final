@@ -1,0 +1,240 @@
+---
+title: "Assignment 1 - The tidyverse"
+author: "Aditya Narayan Rai + adityanarayan-rai"
+date: "`r format(Sys.time(), '%B %d, %Y | %H:%M:%S | %Z')`"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: tango
+    number_sections: no
+    theme: cosmo
+    toc: no
+---
+  
+<style>
+div.answer {background-color:#f3f0ff; border-radius: 5px; padding: 20px;}
+</style>
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      error = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      comment = NA)
+```
+
+<!-- Do not forget to input your Github username in the YAML configuration up there --> 
+
+***
+
+```{r, include = T}
+# To work on this dataset, I am going to use the following packages:
+library(tidyverse)
+library(ggplot2)
+library(legislatoR)
+```
+
+<br>
+
+### Getting started with the Comparative Legislators Database
+
+The Comparative Legislators Database (CLD) includes political, sociodemographic, career, online presence, public attention, and visual information for over 45,000 contemporary and historical politicians from ten countries (see the [corresponding article](https://www.cambridge.org/core/journals/british-journal-of-political-science/article/comparative-legislators-database/D28BB58A8B2C08C8593DB741F42C18B2) for more information). It can be accessed via `legislatoR` - an R package that is available on both [CRAN](https://cran.r-project.org/web/packages/legislatoR/index.html) and [GitHub](https://github.com/saschagobel/legislatoR).
+
+Before you start with the following tasks, skim the tutorial to make yourself familiar with the database. You find it [here](https://cran.r-project.org/web/packages/legislatoR/vignettes/legislatoR.html).
+
+For the following tasks, you will work with ONE of the legislatures. The legislature you'll work with depends on your first name:
+
+| Your first name starts with... | Legislature | Code |
+|---------|-------|-------|
+| A-C | Austrian Nationalrat | `aut` |
+| D-F | Canadian House of Commons | `can` |
+| G-I | Czech Poslanecka Snemovna | `cze` |
+| J-L | Spanish Congreso de los Diputados | `esp` |
+| M-O | French Assemblée | `fra` |
+| P-R | German Bundestag | `deu` |
+| S-U | Irish Dail | `irl` |
+| V-X | UK House of Commons | `gbr` |
+| Y-Z | US House of Representatives  | `usa_house` |
+
+The following tasks will be based on data from the `core` and `political` tables of the database.
+
+<br>
+
+***
+
+### Task 1 - Descriptives
+
+a) What's the overall share of female legislators in the entire dataset?
+
+```{r}
+aut <- get_core(legislature = "aut") #import the Austria Legislator dataset
+#str(aut) #checking the structure of the dataset
+#dim(aut) #checking the dimensions of the dataset
+#names(aut) #checking the variables of the dataset
+
+total_legislators <- nrow(aut) #calculate the total number of legislators
+female_legislators <- sum(aut$sex == "female", na.rm = TRUE) #calculate total number of female legislators
+
+overall_female_share <- (female_legislators / total_legislators) * 100 #calculate the overall share of female legislators
+
+#print the result and limit the decimal to three places
+cat("The overall share of female legislators in the dataset is:", sprintf("%.3f", overall_female_share), "%\n") #note: I used Google (stackoverflow) to learn about this print function and incorporated it here
+```
+
+b) How many (both in absolute and relative terms) legislators died in the same place they were born in?
+
+```{r}
+#first calculate the absolute count of legislators who died in the same place they were born in using filter
+absolute_count <- aut |>
+  filter(!is.na(birthplace) & !is.na(deathplace) & birthplace == deathplace) |>
+  nrow()
+
+#now calculate the relative count (%) of legislators who died in the same place they were born in
+relative_count <- (absolute_count / total_legislators) * 100 #remember we already have total_legislators from the previous question
+
+#print both absolute and relative 
+cat("Absolute count of legislators who died in the same place they were born in:", absolute_count, "\n")
+cat("Relative count (%) of legislators who died in the same place they were born in:", sprintf("%.3f", relative_count), "%\n") #note: I used Google (stackoverflow) to learn about this print function and incorporated it here
+
+```
+
+c) Create a new variable `age_at_death` that reports the age at which legislators died. Then, plot the distribution of that variable for the entire dataset.
+
+```{r}
+#filter the rows with missing values in both the death and birth variables
+aut <- aut |>
+  filter(!is.na(birth) & !is.na(death)) |>
+  #now calculate the age at death using the mutate function
+  mutate(age_at_death = as.integer(difftime(as.Date(death, format = "%Y-%m-%d"), as.Date(birth, format = "%Y-%m-%d"), units = "days") / 365.25)) #dividing by 365.25 means accounting for leap years
+#note: I read about the use of the difftime, as.Date, and format = functions through Google search and incorporated it here
+
+#now plot the distribution of Age at Death using ggplot
+aut |>
+  ggplot(aes(x = age_at_death)) +
+  geom_histogram(binwidth = 5, fill = "green", color = "pink", alpha = 0.7) +
+  labs(
+    title = "Distribution of Age at Death for Legislators in Austria",
+    x = "Age at Death",
+    y = "Frequency"
+  ) +
+  theme_minimal() #note: I used Google (stackoverflow) to learn about the aesthetics aspects of the graph and incorporated it here
+
+```
+
+d) What is the most frequent birthday in your sample (e.g., “January 15")?
+
+```{r}
+#first filter out the rows with missing birth dates
+aut <- aut |>
+  filter(!is.na(birth))
+
+#now extract the day and month from the birth column using mutate function
+aut <- aut |>
+  mutate(birth_date = as.Date(birth, format = "%Y-%m-%d"),
+         birth_month_day = format(birth_date, "%B %d")) #note: I read about the use of the difftime, as.Date, and 'format =' functions through Google search and incorporated it here
+
+#now count the occurances of each birthday using count function
+birthday_counts <- aut |>
+  count(birth_month_day, sort = TRUE)
+
+#calculate most frequent birthday
+most_frequent_birthday <- birthday_counts[1, "birth_month_day"]
+
+#let's check the result now
+cat("The most frequent birthday in the sample is:", most_frequent_birthday, "\n")
+```
+
+e) Generate a table that provides the 5 legislators with the longest names (in terms of number of characters, ignoring whitespace). 
+
+```{r}
+#first filter rows with missing values
+aut <- aut %>%
+  filter(!is.na(name))
+
+#create a variable named name_length to store the length of names without whitespace using mutate function
+aut <- aut %>%
+  mutate(name_length = nchar(gsub(" ", "", name))) #note: I read about the 'nchar' and 'gsub' functions and their uses using the Google search and incorporated it here
+
+#now arrange the new variable in descending order
+aut <- aut %>%
+  arrange(desc(name_length))
+
+#now select top 5 longest names and store it in a new variable
+top_longest_names <- aut %>%
+  head(5)
+
+#print the top 5 longest names
+print(top_longest_names)
+```
+
+<br>
+
+***
+
+### Task 2 - Exploring trends in the data 
+
+a) Using data from all sessions, provide a plot that shows the share of female legislators by session! 
+
+```{r}
+#import the political dataset for Austria
+aut_political <- get_political("aut")
+#names(aut_political) #check names of the political dataset
+#names(aut) #check names of the core dataset
+
+#both the datasets have 'pageid' as the common variable. we will use that to merge both the datasets
+merged_aut <- merge(aut, aut_political, by = "pageid")
+
+#now let's calculate the share of female legislators by session
+female_share_by_session <- merged_aut |>
+  group_by(session) |>
+  summarize(female_share = mean(sex == "female", na.rm = TRUE) * 100) |>
+  arrange(session) #note: I used Google search to understand the combination of these three functions and saw an example of the same in stackoverflow
+
+#let's plot the share of female legislators by session. Will use a line graph
+ggplot(female_share_by_session, aes(x = session, y = female_share, group = 1)) +
+  geom_line(color = "green", size = 1) +
+  geom_point(color = "blue", size = 3) +
+  labs(
+    title = "Share of Female Legislators by Session",
+    x = "Session",
+    y = "Female Share (%)"
+  ) +
+  theme_minimal() #note: I used Google search for geom_line and geom_point and incorporated them here
+```
+
+b) Explore another relation of variables in the dataset. Your analysis should (i) use data from both the `core` and the `political` table and (ii) feature data from several sessions. Also, offer a brief description and interpretation of your findings! 
+
+```{r}
+#building on the question above, I am interested in looking at the party-wise share of female representation across the sessions
+
+#we already have a merged dataset. Let's calculate party-wise share of female representation across the sessions as a new variable
+female_share_by_session_party <- merged_aut %>%
+  group_by(session, party) %>%
+  summarize(female_share = mean(sex == "female", na.rm = TRUE) * 100) %>%
+  arrange(session) #note: I used Google search to understand the combination of these three functions and saw an example of the same in stackoverflow
+
+
+ggplot(female_share_by_session_party, aes(x = session, y = female_share, fill = party)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(
+    title = "Party-wise Share of Female Legislators by Session",
+    x = "Session",
+    y = "Female Share (%)",
+    fill = "Party"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right") #note: I used Google search to learn about this function and incorporated it here
+```
+
+<div class = "answer">
+In the second part of the task 2, I was interested to see the party which has highest female representation across the sessions. And, looking at the bar graph it seems that 'SPO' has taken up the mantle of female representation and has consistently shown higher female representation across the sessions. SPO stands for the Social Democratic Party of Austria and it is one of the oldest party in the country. OVP is trying to catch-up but it is still far behind.
+</div>
+
+<br>
+
+***
+
+
+
